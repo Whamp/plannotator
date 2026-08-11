@@ -18,7 +18,14 @@ import {
 
 // Save and restore env between tests
 const savedEnv: Record<string, string | undefined> = {};
-const envKeys = ["PLANNOTATOR_REMOTE", "PLANNOTATOR_PORT", "SSH_TTY", "SSH_CONNECTION", "PLANNOTATOR_URL_HOST"];
+const envKeys = [
+  "PLANNOTATOR_REMOTE",
+  "PLANNOTATOR_PORT",
+  "SSH_TTY",
+  "SSH_CONNECTION",
+  "PLANNOTATOR_URL_HOST",
+  "PLANNOTATOR_PUBLIC_URL",
+];
 
 function clearEnv() {
   for (const key of envKeys) {
@@ -297,6 +304,20 @@ describe("buildAdvertisedUrl", () => {
     process.env.PLANNOTATOR_REMOTE = "1";
     process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
     expect(buildAdvertisedUrl(19432)).toBe("http://my-machine.tailnet.ts.net:19432");
+  });
+
+  test("uses a public HTTPS URL without appending the local runtime port", () => {
+    clearEnv();
+    process.env.PLANNOTATOR_REMOTE = "1";
+    process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
+    process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
+    expect(buildAdvertisedUrl(19432)).toBe("https://plannotator.example.com");
+  });
+
+  test("a local session ignores the public URL and advertises localhost", () => {
+    clearEnv();
+    process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
+    expect(buildAdvertisedUrl(1234)).toBe("http://localhost:1234");
   });
 
   test("keeps bracketed IPv6 hosts intact", () => {
