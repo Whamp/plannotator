@@ -9,7 +9,11 @@
  */
 
 import { parsePortSelection } from "@plannotator/shared/port-range";
-import { loadConfig, resolveUrlHost } from "@plannotator/shared/config";
+import {
+  loadConfig,
+  resolvePublicUrl,
+  resolveUrlHost,
+} from "@plannotator/shared/config";
 import { isAutoUrlHost, resolveAutoHostCached } from "@plannotator/shared/tailscale";
 
 const DEFAULT_REMOTE_PORT = 19432;
@@ -152,39 +156,44 @@ export function getServerHostname(): string {
   return isRemoteSession() ? "0.0.0.0" : LOOPBACK_HOST;
 }
 
-/** True when the advertised-URL host is overridden away from localhost. */
+/** True when the advertised session URL is overridden away from localhost. */
 export function isUrlHostOverridden(): boolean {
-  const host = resolveUrlHost(loadConfig());
+  const config = loadConfig();
+  if (resolvePublicUrl(config) !== undefined) return true;
+  const host = resolveUrlHost(config);
   if (host === undefined) return false;
   if (isAutoUrlHost(host)) return isRemoteSession() && resolveAutoHostCached() !== undefined;
   return true;
 }
 
-let warnedLocalUrlHost = false;
+let warnedLocalAdvertisedUrlOverride = false;
 
 /**
  * Compose the URL advertised to the user for a bound port (issue #657).
- * Display-only: the PLANNOTATOR_URL_HOST / urlHost override changes what is
- * printed and opened, never which interface the server listens on
- * (getServerHostname). Remote sessions only: a local session binds loopback,
- * so honoring the override would advertise (and auto-open) a URL nothing is
- * listening on — the override is ignored with a once-per-process warning.
- * The "auto" sentinel resolves the host from Tailscale (resolveAutoHost).
- * Same-machine subprocesses must not use this — they get a loopback URL so a
- * tailnet-only hostname can't break local agent jobs.
+ * Display-only: PLANNOTATOR_PUBLIC_URL / publicUrl selects a complete reverse-
+ * proxy origin, while PLANNOTATOR_URL_HOST / urlHost selects a host and keeps
+ * the runtime port. Neither changes the bind interface (getServerHostname).
+ * Remote sessions only: a local session binds loopback, so overrides are
+ * ignored with a once-per-process warning. The "auto" host sentinel resolves
+ * from Tailscale. Same-machine subprocesses must not use this URL; they get a
+ * separate loopback URL from their server owner.
  */
 export function buildAdvertisedUrl(port: number): string {
-  const host = resolveUrlHost(loadConfig());
-  if (host === undefined) return `http://localhost:${port}`;
+  const config = loadConfig();
+  const publicUrl = resolvePublicUrl(config);
+  const host = resolveUrlHost(config);
+  const override = publicUrl ?? host;
+  if (override === undefined) return `http://localhost:${port}`;
   if (!isRemoteSession()) {
-    if (!warnedLocalUrlHost) {
-      warnedLocalUrlHost = true;
+    if (!warnedLocalAdvertisedUrlOverride) {
+      warnedLocalAdvertisedUrlOverride = true;
       process.stderr.write(
-        `[plannotator] Warning: advertised URL host ${JSON.stringify(host)} ignored — this is a local session, so the server binds loopback and only localhost is reachable. Set PLANNOTATOR_REMOTE=1 to use the override.\n`,
+        `[plannotator] Warning: advertised URL override ${JSON.stringify(override)} ignored — this is a local session, so the server binds loopback and only localhost is reachable. Set PLANNOTATOR_REMOTE=1 to use the override.\n`,
       );
     }
     return `http://localhost:${port}`;
   }
+  if (publicUrl !== undefined) return publicUrl;
   const resolved = isAutoUrlHost(host) ? resolveAutoHostCached() : host;
   if (resolved === undefined) return `http://localhost:${port}`;
   return `http://${resolved}:${port}`;
