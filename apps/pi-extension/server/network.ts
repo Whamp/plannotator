@@ -8,14 +8,9 @@ import { existsSync } from "node:fs";
 import type { Server } from "node:http";
 import { release } from "node:os";
 import { delimiter, join } from "node:path";
-import {
-	loadConfig,
-	resolvePublicUrl,
-	resolveUrlHost,
-	resolveUseGlimpse,
-} from "../generated/config.ts";
+import { loadConfig, resolveUseGlimpse } from "../generated/config.ts";
+import { resolveAdvertisedSessionUrl } from "../generated/advertised-url.ts";
 import { parsePortSelection } from "../generated/port-range.ts";
-import { isAutoUrlHost, resolveAutoHostCached } from "../generated/tailscale.ts";
 
 const DEFAULT_REMOTE_PORT = 19432;
 const LOOPBACK_HOST = "127.0.0.1";
@@ -122,63 +117,9 @@ export function getServerHostname(): string {
 	return isRemoteSession() ? "0.0.0.0" : LOOPBACK_HOST;
 }
 
-/** True when the advertised session URL is overridden away from localhost. */
-export function isUrlHostOverridden(): boolean {
-	const config = loadConfig();
-	if (resolvePublicUrl(config) !== undefined) return true;
-	const host = resolveUrlHost(config);
-	if (host === undefined) return false;
-	if (isAutoUrlHost(host)) return isRemoteSession() && resolveAutoHostCached() !== undefined;
-	return true;
-}
-
-function publicUrlAppliesToPort(port: number): boolean {
-	const { ports, isRange } = getServerPortConfiguration();
-	return !isRange || port === ports[0];
-}
-
-/** True when a remote advertised URL can open without port forwarding. */
-export function isAdvertisedUrlDirectlyReachable(url: string): boolean {
-	if (!URL.canParse(url)) return false;
-	const hostname = new URL(url).hostname;
-	return hostname !== "localhost" && hostname !== LOOPBACK_HOST && hostname !== "[::1]";
-}
-
-let warnedLocalAdvertisedUrlOverride = false;
-
-/**
- * Compose the URL advertised to the user for a bound port (issue #657).
- * Display-only: PLANNOTATOR_PUBLIC_URL / publicUrl selects a complete reverse-
- * proxy origin for a fixed port or the first port in a configured range. Later
- * range ports fall back to PLANNOTATOR_URL_HOST / urlHost and keep the runtime
- * port. Neither setting changes the bind interface (getServerHostname).
- * Remote sessions only: a local session binds loopback, so overrides are
- * ignored with a once-per-process warning. The "auto" host sentinel resolves
- * from Tailscale. Same-machine subprocesses must not use this URL; they get a
- * separate loopback URL from their server owner.
- * Mirrors packages/server/remote.ts — keep the two behaviorally identical.
- */
+/** Compose the display-only URL advertised for a bound server port. */
 export function buildAdvertisedUrl(port: number): string {
-	const config = loadConfig();
-	const publicUrl = resolvePublicUrl(config);
-	const host = resolveUrlHost(config);
-	const override = publicUrl ?? host;
-	if (override === undefined) return `http://localhost:${port}`;
-	if (!isRemoteSession()) {
-		if (!warnedLocalAdvertisedUrlOverride) {
-			warnedLocalAdvertisedUrlOverride = true;
-			process.stderr.write(
-				`[plannotator] Warning: advertised URL override ${JSON.stringify(override)} ignored — this is a local session, so the server binds loopback and only localhost is reachable. Set PLANNOTATOR_REMOTE=1 to use the override.\n`,
-			);
-		}
-		return `http://localhost:${port}`;
-	}
-	if (publicUrl !== undefined && publicUrlAppliesToPort(port)) return publicUrl;
-	const resolved = host !== undefined && isAutoUrlHost(host)
-		? resolveAutoHostCached()
-		: host;
-	if (resolved === undefined) return `http://localhost:${port}`;
-	return `http://${resolved}:${port}`;
+	return resolveAdvertisedSessionUrl(port, isRemoteSession());
 }
 
 const MAX_RETRIES = 5;

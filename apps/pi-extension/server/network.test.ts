@@ -4,7 +4,6 @@ import { closeServer, occupyConsecutivePorts } from "../../../tests/helpers/port
 import {
 	buildAdvertisedUrl,
 	getServerHostname,
-	isAdvertisedUrlDirectlyReachable,
 	getServerPort,
 	getServerPorts,
 	isNoOpBrowserSentinel,
@@ -288,82 +287,10 @@ describe("pi browser no-op sentinels", () => {
 });
 
 describe("pi buildAdvertisedUrl", () => {
-	test("defaults to localhost", () => {
+	test("passes the Pi runtime's remote state to the shared URL policy", () => {
 		clearEnv();
 		process.env.PLANNOTATOR_REMOTE = "1";
-		// An empty (but set) env var suppresses any urlHost in the developer's
-		// real config.json, isolating the default path.
-		process.env.PLANNOTATOR_URL_HOST = "";
-		expect(buildAdvertisedUrl(19432)).toBe("http://localhost:19432");
-	});
-
-	test("a local session ignores the override and advertises localhost", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
-		expect(buildAdvertisedUrl(1234)).toBe("http://localhost:1234");
-	});
-
-	test("appends the runtime port to the override host", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_REMOTE = "1";
-		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
-		expect(buildAdvertisedUrl(19432)).toBe("http://my-machine.tailnet.ts.net:19432");
-	});
-
-	test("uses a public HTTPS URL without appending the local runtime port", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_REMOTE = "1";
-		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
 		process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
 		expect(buildAdvertisedUrl(19432)).toBe("https://plannotator.example.com");
-	});
-
-	test("uses the public URL only for the first port in a configured range", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_REMOTE = "1";
-		process.env.PLANNOTATOR_PORT = "19432-19463";
-		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
-		process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
-		expect(buildAdvertisedUrl(19432)).toBe("https://plannotator.example.com");
-		expect(buildAdvertisedUrl(19433)).toBe("http://my-machine.tailnet.ts.net:19433");
-		process.env.PLANNOTATOR_URL_HOST = "";
-		expect(buildAdvertisedUrl(19434)).toBe("http://localhost:19434");
-	});
-
-	test("classifies only non-loopback advertised URLs as directly reachable", () => {
-		expect(isAdvertisedUrlDirectlyReachable("https://plannotator.example.com")).toBe(true);
-		expect(isAdvertisedUrlDirectlyReachable("http://my-machine.tailnet.ts.net:19433")).toBe(true);
-		expect(isAdvertisedUrlDirectlyReachable("http://localhost:19433")).toBe(false);
-		expect(isAdvertisedUrlDirectlyReachable("http://127.0.0.1:19433")).toBe(false);
-		expect(isAdvertisedUrlDirectlyReachable("http://[::1]:19433")).toBe(false);
-		expect(isAdvertisedUrlDirectlyReachable("not a URL")).toBe(false);
-	});
-
-	test("a local session ignores the public URL and advertises localhost", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
-		expect(buildAdvertisedUrl(1234)).toBe("http://localhost:1234");
-	});
-
-	test("keeps bracketed IPv6 hosts intact", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_REMOTE = "1";
-		process.env.PLANNOTATOR_URL_HOST = "[fd7a::1]";
-		expect(buildAdvertisedUrl(9999)).toBe("http://[fd7a::1]:9999");
-	});
-
-	test("an invalid host falls back to localhost instead of throwing", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_REMOTE = "1";
-		process.env.PLANNOTATOR_URL_HOST = "https://evil.example/path";
-		expect(buildAdvertisedUrl(1234)).toBe("http://localhost:1234");
-	});
-
-	test("the override never affects the bind hostname", () => {
-		clearEnv();
-		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
-		expect(getServerHostname()).toBe("127.0.0.1");
-		process.env.PLANNOTATOR_REMOTE = "1";
-		expect(getServerHostname()).toBe("0.0.0.0");
 	});
 });

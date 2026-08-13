@@ -445,8 +445,11 @@ export function resolveSharingEnabled(config: PlannotatorConfig): boolean {
 
 /** Validate a public reverse-proxy URL as an HTTP(S) origin without a path. */
 export function isValidPublicUrl(value: string): boolean {
-  if (!URL.canParse(value)) return false;
-  const url = new URL(value);
+  const publicUrl = value.trim();
+  if (!/^https?:\/\/[^\s/?#\\]+\/?$/i.test(publicUrl) || !URL.canParse(publicUrl)) {
+    return false;
+  }
+  const url = new URL(publicUrl);
   return (url.protocol === "http:" || url.protocol === "https:")
     && url.username === ""
     && url.password === ""
