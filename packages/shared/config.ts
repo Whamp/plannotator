@@ -196,14 +196,14 @@ export interface PlannotatorConfig {
    */
   cursorSandbox?: boolean;
   /**
-   * Full HTTP(S) reverse-proxy origin advertised only in remote sessions.
-   * Never changes binding; PLANNOTATOR_PUBLIC_URL takes precedence.
+   * Full HTTP(S) reverse-proxy origin for remote sessions; range: first port only.
+   * Never changes binding; PLANNOTATOR_PUBLIC_URL overrides the config value.
    * Paths, credentials, queries, and fragments are rejected.
    */
   publicUrl?: string;
   /**
-   * Host-only remote URL override; the runtime port is always appended.
-   * Ignored when publicUrl is set; PLANNOTATOR_URL_HOST takes precedence.
+   * Host-only override with runtime port; used when publicUrl does not apply.
+   * PLANNOTATOR_URL_HOST overrides the config value.
    */
   urlHost?: string;
   /**

@@ -4,6 +4,7 @@ import { closeServer, occupyConsecutivePorts } from "../../../tests/helpers/port
 import {
 	buildAdvertisedUrl,
 	getServerHostname,
+	isAdvertisedUrlDirectlyReachable,
 	getServerPort,
 	getServerPorts,
 	isNoOpBrowserSentinel,
@@ -315,6 +316,27 @@ describe("pi buildAdvertisedUrl", () => {
 		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
 		process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
 		expect(buildAdvertisedUrl(19432)).toBe("https://plannotator.example.com");
+	});
+
+	test("uses the public URL only for the first port in a configured range", () => {
+		clearEnv();
+		process.env.PLANNOTATOR_REMOTE = "1";
+		process.env.PLANNOTATOR_PORT = "19432-19463";
+		process.env.PLANNOTATOR_URL_HOST = "my-machine.tailnet.ts.net";
+		process.env.PLANNOTATOR_PUBLIC_URL = "https://plannotator.example.com";
+		expect(buildAdvertisedUrl(19432)).toBe("https://plannotator.example.com");
+		expect(buildAdvertisedUrl(19433)).toBe("http://my-machine.tailnet.ts.net:19433");
+		process.env.PLANNOTATOR_URL_HOST = "";
+		expect(buildAdvertisedUrl(19434)).toBe("http://localhost:19434");
+	});
+
+	test("classifies only non-loopback advertised URLs as directly reachable", () => {
+		expect(isAdvertisedUrlDirectlyReachable("https://plannotator.example.com")).toBe(true);
+		expect(isAdvertisedUrlDirectlyReachable("http://my-machine.tailnet.ts.net:19433")).toBe(true);
+		expect(isAdvertisedUrlDirectlyReachable("http://localhost:19433")).toBe(false);
+		expect(isAdvertisedUrlDirectlyReachable("http://127.0.0.1:19433")).toBe(false);
+		expect(isAdvertisedUrlDirectlyReachable("http://[::1]:19433")).toBe(false);
+		expect(isAdvertisedUrlDirectlyReachable("not a URL")).toBe(false);
 	});
 
 	test("a local session ignores the public URL and advertises localhost", () => {

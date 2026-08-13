@@ -72,7 +72,7 @@ import {
 	type Phase,
 	stripPlanningOnlyTools,
 } from "./tool-scope.ts";
-import { isRemoteSession, isUrlHostOverridden } from "./server/network.ts";
+import { isAdvertisedUrlDirectlyReachable, isRemoteSession } from "./server/network.ts";
 import { isBrowserSessionStoppedError } from "./browser-session-error.ts";
 import { classifyAnnotateOutcome } from "./annotate-outcome.ts";
 
@@ -168,7 +168,7 @@ function sessionOpenedMessage(label: string, url: string): string {
 	if (!isRemoteSession()) return `${label}. You can keep chatting while it runs.`;
 	// With an advertised-URL host override the link is directly reachable
 	// (e.g. over a tailnet), so the port-forwarding advice would be wrong.
-	return isUrlHostOverridden()
+	return isAdvertisedUrlDirectlyReachable(url)
 		? `${label} — open ${url} on your device. You can keep chatting while it runs.`
 		: `${label} — open ${url} on your local machine (forward the port if needed). You can keep chatting while it runs.`;
 }

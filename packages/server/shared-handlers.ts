@@ -9,7 +9,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { openBrowser as openBrowserImpl } from "./browser";
-import { isUrlHostOverridden } from "./remote";
+import { isAdvertisedUrlDirectlyReachable } from "./remote";
 import { writeUrlQr } from "./qr";
 import { validateImagePath, validateUploadExtension, UPLOAD_DIR } from "./image";
 import { saveDraft, loadDraft, deleteDraft, getDraftGeneration } from "./draft";
@@ -250,10 +250,10 @@ export async function handleServerReady(
   if (isRemote) {
     // With an advertised-URL host override the link is directly reachable
     // (e.g. over a tailnet), so the port-forwarding advice would be wrong.
-    if (isUrlHostOverridden()) {
+    if (isAdvertisedUrlDirectlyReachable(url)) {
       process.stderr.write(`\n  Plannotator session ready — open on your device:\n  ${url}\n\n`);
-      // The URL makes a device hop; a QR skips the retyping (TTY only). Only
-      // for overridden hosts: a QR of a localhost URL scans to nowhere.
+      // The URL makes a device hop; a QR skips retyping it (TTY only). A QR
+      // of a localhost URL would scan to nowhere, so only render one here.
       writeUrlQr(url);
     } else {
       process.stderr.write(
