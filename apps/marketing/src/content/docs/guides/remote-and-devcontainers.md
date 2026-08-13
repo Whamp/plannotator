@@ -49,7 +49,17 @@ export PLANNOTATOR_PORT=19432
 export PLANNOTATOR_PUBLIC_URL=https://plannotator.example.com
 ```
 
-Plannotator then prints and opens `https://plannotator.example.com` while continuing to listen on local port `19432`. `PLANNOTATOR_PUBLIC_URL` is display-only: the reverse proxy must route that origin to the configured local port. Use a fixed local port unless the proxy can route each port in a configured range.
+Plannotator then prints and opens `https://plannotator.example.com` while continuing to listen on local port `19432`. `PLANNOTATOR_PUBLIC_URL` is display-only: the reverse proxy must route that origin to the configured local port.
+
+A port range can keep additional sessions available through a directly reachable host while the reverse proxy continues to expose the first port:
+
+```bash
+export PLANNOTATOR_PORT=19432-19463
+export PLANNOTATOR_PUBLIC_URL=https://plannotator.example.com
+export PLANNOTATOR_URL_HOST=my-machine.tailnet.ts.net
+```
+
+The session on `19432` advertises the public origin. Sessions on later ports advertise `http://my-machine.tailnet.ts.net:<port>`. The public origin still exposes only the first session; concurrent public sessions require a proxy that routes each session separately.
 
 Only HTTP(S) origins are accepted. Paths are unsupported because Plannotator serves root-relative application and API routes. Protect internet-facing deployments with authentication at the reverse proxy; a Plannotator session exposes reviewed content and can submit approval or feedback.
 

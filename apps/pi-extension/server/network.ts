@@ -132,13 +132,26 @@ export function isUrlHostOverridden(): boolean {
 	return true;
 }
 
+function publicUrlAppliesToPort(port: number): boolean {
+	const { ports, isRange } = getServerPortConfiguration();
+	return !isRange || port === ports[0];
+}
+
+/** True when a remote advertised URL can open without port forwarding. */
+export function isAdvertisedUrlDirectlyReachable(url: string): boolean {
+	if (!URL.canParse(url)) return false;
+	const hostname = new URL(url).hostname;
+	return hostname !== "localhost" && hostname !== LOOPBACK_HOST && hostname !== "[::1]";
+}
+
 let warnedLocalAdvertisedUrlOverride = false;
 
 /**
  * Compose the URL advertised to the user for a bound port (issue #657).
  * Display-only: PLANNOTATOR_PUBLIC_URL / publicUrl selects a complete reverse-
- * proxy origin, while PLANNOTATOR_URL_HOST / urlHost selects a host and keeps
- * the runtime port. Neither changes the bind interface (getServerHostname).
+ * proxy origin for a fixed port or the first port in a configured range. Later
+ * range ports fall back to PLANNOTATOR_URL_HOST / urlHost and keep the runtime
+ * port. Neither setting changes the bind interface (getServerHostname).
  * Remote sessions only: a local session binds loopback, so overrides are
  * ignored with a once-per-process warning. The "auto" host sentinel resolves
  * from Tailscale. Same-machine subprocesses must not use this URL; they get a
@@ -160,8 +173,10 @@ export function buildAdvertisedUrl(port: number): string {
 		}
 		return `http://localhost:${port}`;
 	}
-	if (publicUrl !== undefined) return publicUrl;
-	const resolved = isAutoUrlHost(host) ? resolveAutoHostCached() : host;
+	if (publicUrl !== undefined && publicUrlAppliesToPort(port)) return publicUrl;
+	const resolved = host !== undefined && isAutoUrlHost(host)
+		? resolveAutoHostCached()
+		: host;
 	if (resolved === undefined) return `http://localhost:${port}`;
 	return `http://${resolved}:${port}`;
 }
